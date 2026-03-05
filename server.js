@@ -23,10 +23,12 @@ app.get("/api/health", (req, res) => {
 // Import routes
 const customerRoutes = require("./src/routes/customer.routes");
 const productRoutes = require("./src/routes/product.routes");
+const invoiceRoutes = require("./src/routes/invoice.routes");
 
 // Mount routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/invoices", invoiceRoutes);
 
 // Generic 404 handler (must be last)
 app.use((req, res) => {
@@ -43,4 +45,5 @@ app.listen(PORT, () => {
   console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
   console.log(`👥 Customers API: http://localhost:${PORT}/api/customers`);
   console.log(`📦 Products API: http://localhost:${PORT}/api/products`);
+  console.log(`🧾 Invoices API: http://localhost:${PORT}/api/invoices`);
 });
