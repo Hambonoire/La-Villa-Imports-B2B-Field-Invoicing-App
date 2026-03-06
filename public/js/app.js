@@ -83,6 +83,9 @@ function init() {
   // Load next invoice number
   loadNextInvoiceNumber();
 
+  // Load last custom invoice number for placeholder
+  loadLastCustomNumber(); // ADD THIS LINE
+
   console.log("La Villa Invoice App initialized");
 }
 
@@ -652,28 +655,47 @@ function displayInvoicePreview(invoice) {
  * Handle generate invoice
  */
 async function handleGenerate() {
-  if (!confirm("Generate this invoice? This action cannot be undone.")) {
-    return;
-  }
-
   showLoading(true);
 
   try {
     const invoiceData = invoiceBuilder.getInvoiceData();
-    console.log("Invoice data:", invoiceData);
 
-    // Get custom invoice number BEFORE calling API
+    // Get custom invoice number BEFORE validation
     const customInvoiceNumber = getInvoiceNumber();
     console.log("Custom invoice number:", customInvoiceNumber);
     if (customInvoiceNumber) {
       invoiceData.customInvoiceNumber = customInvoiceNumber;
     }
 
+    // VALIDATE FIRST using preview endpoint
+    try {
+      await apiClient.previewInvoice(invoiceData);
+    } catch (error) {
+      // Validation failed - show error and stop
+      alert("Error: " + error.message);
+      showLoading(false);
+      return;
+    }
+
+    showLoading(false);
+
+    // Validation passed - NOW show confirmation
+    if (!confirm("Generate this invoice? This action cannot be undone.")) {
+      return;
+    }
+
+    showLoading(true);
+
+    // Generate the invoice
     const response = await apiClient.generateInvoice(invoiceData);
 
     // Show success notification with buttons
     const result = response;
+
     if (result.success) {
+      invoiceBuilder.state.invoiceNumber = response.data.invoiceNumber;
+      console.log("Full invoice data:", invoiceBuilder.getInvoiceData());
+
       alert(`Invoice ${result.data.invoiceNumber} generated successfully!`);
 
       // Get the invoice actions container
@@ -707,14 +729,19 @@ async function handleGenerate() {
         link.click();
       };
 
+      // Close button
+      const closeBtn = document.createElement("button");
+      closeBtn.textContent = "✖ Close";
+      closeBtn.className =
+        "invoice-actions__button invoice-actions__button--secondary";
+      closeBtn.onclick = () => {
+        buttonContainer.remove();
+      };
+
       buttonContainer.appendChild(printBtn);
       buttonContainer.appendChild(downloadBtn);
+      buttonContainer.appendChild(closeBtn);
       actionsContainer.appendChild(buttonContainer);
-
-      // Reset form after 5 seconds
-      setTimeout(() => {
-        buttonContainer.remove();
-      }, 5000);
     }
   } catch (error) {
     alert("Error generating invoice: " + error.message);
@@ -760,9 +787,31 @@ async function loadNextInvoiceNumber() {
   try {
     const response = await apiClient.getNextInvoiceNumber();
     elements.nextInvoiceNumber.textContent = response.data.invoiceNumber;
+    // Update format hint with current date
+    const formatHint = document.querySelector(".invoice-details__field small");
+    if (formatHint) formatHint.textContent = `Format: ${response.data.invoiceNumber}`;
   } catch (error) {
     console.error("Error loading next invoice number:", error);
     elements.nextInvoiceNumber.textContent = "Error loading";
+  }
+}
+
+/**
+ * Load last custom invoice number for placeholder
+ */
+async function loadLastCustomNumber() {
+  try {
+    const response = await apiClient.getLastCustomNumber();
+    if (response.success && response.data.lastCustomNumber) {
+      elements.customInvoiceNumber.placeholder = `Last used: ${response.data.lastCustomNumber}`;
+    } else {
+      elements.customInvoiceNumber.placeholder =
+        "e.g., INV-20260306-001 (optional)";
+    }
+  } catch (error) {
+    console.error("Error loading last custom invoice number:", error);
+    elements.customInvoiceNumber.placeholder =
+      "e.g., INV-20260306-001 (optional)";
   }
 }
 

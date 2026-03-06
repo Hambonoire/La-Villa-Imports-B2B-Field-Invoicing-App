@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const invoiceNumberManager = require("../utils/invoiceNumberManager");
 const pdfGenerator = require("../services/pdfGenerator");
+const invoiceDatabase = require("../services/invoiceDatabase.service");
 
 /**
  * Invoice Controller
@@ -33,6 +34,35 @@ class InvoiceController {
         JSON.stringify({
           success: false,
           error: `Failed to get next invoice number: ${error.message}`,
+        }),
+      );
+    }
+  }
+
+  /**
+   * Get last custom invoice number
+   */
+  async getLastCustomInvoiceNumber(req, res) {
+    try {
+      const lastCustomNumber =
+        await invoiceDatabase.getLastCustomInvoiceNumber();
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: true,
+          data: {
+            lastCustomNumber: lastCustomNumber || null,
+          },
+        }),
+      );
+    } catch (error) {
+      console.error("Get last custom invoice number error:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to get last custom invoice number: ${error.message}`,
         }),
       );
     }
@@ -84,6 +114,27 @@ class InvoiceController {
           );
           return;
         }
+
+        // Validate sequential order
+        const invoiceValidator = require("../utils/invoiceValidator");
+        try {
+          const validation =
+            await invoiceValidator.validateSequential(customInvoiceNumber);
+          if (!validation.isValid) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: validation.error,
+              }),
+            );
+            return;
+          }
+        } catch (error) {
+          console.error("Sequential validation error:", error);
+          // Allow preview if validation check fails
+        }
+
         invoiceNumber = customInvoiceNumber;
       } else {
         const next = invoiceNumberManager.getNextInvoiceNumber();
@@ -188,6 +239,8 @@ class InvoiceController {
 
       // Generate or use custom invoice number and increment counter
       let invoiceNumber;
+      let isCustomNumber = false;
+
       if (customInvoiceNumber) {
         if (!invoiceNumberManager.validateInvoiceNumber(customInvoiceNumber)) {
           res.writeHead(400, { "Content-Type": "application/json" });
@@ -199,9 +252,47 @@ class InvoiceController {
           );
           return;
         }
+
+        // Check if custom number already exists
+        const exists =
+          await invoiceDatabase.invoiceNumberExists(customInvoiceNumber);
+        if (exists) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              success: false,
+              error:
+                "Invoice number already exists. Please use a different number.",
+            }),
+          );
+          return;
+        }
+
+        // Validate sequential order
+        const invoiceValidator = require("../utils/invoiceValidator");
+        try {
+          const validation = await
+            invoiceValidator.validateSequential(customInvoiceNumber);
+          if (!validation.isValid) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: validation.error,
+              }),
+            );
+            return;
+          }
+        } catch (error) {
+          console.error("Sequential validation error:", error);
+          // Allow invoice creation if validation check fails
+        }
+
         invoiceNumber = customInvoiceNumber;
+        isCustomNumber = true;
       } else {
         invoiceNumber = invoiceNumberManager.incrementCounter();
+        isCustomNumber = false;
       }
 
       const currentDate = new Date().toISOString();
@@ -237,6 +328,14 @@ class InvoiceController {
         createdAt: new Date(),
       };
 
+      // Save to database
+      console.log("💾 Saving invoice to database:", invoiceNumber);
+      const invoiceId = await invoiceDatabase.saveInvoice(
+        invoice,
+        isCustomNumber,
+      );
+      console.log("✅ Invoice saved with ID:", invoiceId);
+
       // Generate PDF
       console.log("📝 Generating invoice PDF:", invoiceNumber);
       const { filepath, filename } =
@@ -246,14 +345,13 @@ class InvoiceController {
       console.log("Total:", `$${invoice.total.toFixed(2)}`);
       console.log("Payment Terms:", paymentTerms);
 
-      // TODO: Save invoice data to database
-
       res.writeHead(201, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
           success: true,
           data: {
             ...invoice,
+            id: invoiceId,
             pdfPath: filepath,
             pdfFilename: filename,
           },

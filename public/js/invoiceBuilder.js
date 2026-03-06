@@ -153,6 +153,7 @@ const invoiceBuilder = {
     const totals = this.calculateTotals();
 
     return {
+      invoiceNumber: this.state.invoiceNumber || null,
       customer: this.state.customer,
       items: this.state.items.map((item) => ({
         productId: item.productId,

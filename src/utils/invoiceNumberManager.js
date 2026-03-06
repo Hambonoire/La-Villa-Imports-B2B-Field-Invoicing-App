@@ -56,16 +56,8 @@ class InvoiceNumberManager {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateString = `${year}${month}${day}`;
-
-    // Check if date changed - if so, reset counter
-    const lastDate = counter.lastInvoiceDate;
-    let nextNumber;
-
-    if (lastDate === dateString) {
-      nextNumber = counter.lastInvoiceNumber + 1;
-    } else {
-      nextNumber = 1;
-    }
+    // Continuous numbering - never reset
+    const nextNumber = counter.lastInvoiceNumber + 1;
 
     const invoiceNumber = `INV-${dateString}-${String(nextNumber).padStart(3, '0')}`;
 

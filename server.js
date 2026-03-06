@@ -71,6 +71,11 @@ router.get("/api/invoices/pdf/:invoiceNumber", (req, res) => {
 router.get("/api/invoices/next-number", (req, res) => {
   invoiceController.getNextInvoiceNumber(req, res);
 });
+
+router.get("/api/invoices/last-custom-number", (req, res) => {
+  invoiceController.getLastCustomInvoiceNumber(req, res);
+});
+
 router.post("/api/invoices/calculate", (req, res) => {
   invoiceController.calculateInvoice(req, res);
 });

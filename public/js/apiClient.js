@@ -2,9 +2,13 @@ const apiClient = {
   async get(endpoint) {
     const response = await fetch(endpoint);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      console.error('API Error:', error);
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      console.error("API Error:", error);
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`,
+      );
     }
     return response.json();
   },
@@ -16,9 +20,13 @@ const apiClient = {
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      console.error('API Error:', error);
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      console.error("API Error:", error);
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`,
+      );
     }
     return response.json();
   },
@@ -70,5 +78,12 @@ const apiClient = {
    */
   async generateInvoice(data) {
     return this.post("/api/invoices", data);
+  },
+
+  /**
+   * Get last custom invoice number
+   */
+  async getLastCustomNumber() {
+    return this.get("/api/invoices/last-custom-number");
   },
 };
