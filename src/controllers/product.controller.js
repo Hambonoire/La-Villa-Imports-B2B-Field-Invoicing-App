@@ -1,104 +1,87 @@
-const woocommerceService = require("../services/woocommerce.service");
-
-/**
- * Product Controller
- * Handles HTTP requests related to products
- */
+const pool = require("../config/database");
 
 /**
  * Get all products
- * GET /api/products
  */
 exports.getAllProducts = async (req, res) => {
   try {
-    const { per_page, page, category, search } = req.query;
+    const result = await pool.query(
+      `SELECT id, name, description, price, category, sku
+       FROM products 
+       ORDER BY name ASC`
+    );
 
-    const params = {
-      per_page: per_page || 100,
-      page: page || 1,
-    };
+    // Transform data to ensure price is a number
+    const products = result.rows.map(product => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: parseFloat(product.price),
+      category: product.category,
+      sku: product.sku
+    }));
 
-    if (category) {
-      params.category = category;
-    }
-
-    if (search) {
-      params.search = search;
-    }
-
-    const products = await woocommerceService.getProducts(params);
-
-    res.json({
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: true,
-      count: products.length,
       data: products,
-    });
+    }));
   } catch (error) {
     console.error("Controller error:", error);
-    res.status(500).json({
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: false,
-      error: error.message,
-    });
+      error: "Failed to fetch products",
+    }));
   }
 };
 
 /**
- * Get single product by ID
- * GET /api/products/:id
+ * Get product by ID
  */
 exports.getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!id || isNaN(id)) {
-      return res.status(400).json({
+    const result = await pool.query(
+      `SELECT id, name, description, price, category, sku
+       FROM products 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
         success: false,
-        error: "Valid product ID is required",
-      });
+        error: "Product not found",
+      }));
+      return;
     }
 
-    const product = await woocommerceService.getProductById(parseInt(id));
+    const product = result.rows[0];
 
-    res.json({
+    // Transform data to ensure price is a number
+    const transformedProduct = {
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: parseFloat(product.price),
+      category: product.category,
+      sku: product.sku
+    };
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: true,
-      data: product,
-    });
+      data: transformedProduct,
+    }));
   } catch (error) {
     console.error("Controller error:", error);
-    res.status(500).json({
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: false,
-      error: error.message,
-    });
-  }
-};
-
-/**
- * Search products by SKU
- * GET /api/products/sku/:sku
- */
-exports.searchBySku = async (req, res) => {
-  try {
-    const { sku } = req.params;
-
-    if (!sku) {
-      return res.status(400).json({
-        success: false,
-        error: "SKU is required",
-      });
-    }
-
-    const products = await woocommerceService.searchProductBySku(sku);
-
-    res.json({
-      success: true,
-      count: products.length,
-      data: products,
-    });
-  } catch (error) {
-    console.error("Controller error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+      error: "Failed to fetch product",
+    }));
   }
 };

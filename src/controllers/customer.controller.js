@@ -1,69 +1,114 @@
-const woocommerceService = require("../services/woocommerce.service");
+const pool = require("../config/database");
 
 /**
- * Customer Controller
- * Handles HTTP requests related to customers
- */
-
-/**
- * Get all customers
- * GET /api/customers
+ * Get all customers with pagination
  */
 exports.getAllCustomers = async (req, res) => {
   try {
-    const { per_page, page, search } = req.query;
+    const { per_page = 50, page = 1 } = req.query || {};
+    const limit = parseInt(per_page);
+    const offset = (parseInt(page) - 1) * limit;
 
-    const params = {
-      per_page: per_page || 100,
-      page: page || 1,
-    };
+    const countResult = await pool.query(
+      "SELECT COUNT(*) as total FROM customers"
+    );
+    const total = parseInt(countResult.rows[0].total);
 
-    if (search) {
-      params.search = search;
-    }
+    const result = await pool.query(
+      `SELECT id, name, company, email, phone, address, city, state, zip
+       FROM customers 
+       ORDER BY name ASC 
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
 
-    const customers = await woocommerceService.getCustomers(params);
+    // Transform data to match frontend expectations
+    const customers = result.rows.map(customer => ({
+      id: customer.id,
+      name: customer.name,
+      company: customer.company,
+      email: customer.email,
+      phone: customer.phone,
+      address: {
+        street: customer.address,
+        city: customer.city,
+        state: customer.state,
+        postcode: customer.zip
+      }
+    }));
 
-    res.json({
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: true,
-      count: customers.length,
       data: customers,
-    });
+      pagination: {
+        total,
+        per_page: limit,
+        current_page: parseInt(page),
+        total_pages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     console.error("Controller error:", error);
-    res.status(500).json({
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: false,
-      error: error.message,
-    });
+      error: "Failed to fetch customers",
+    }));
   }
 };
 
 /**
- * Get single customer by ID
- * GET /api/customers/:id
+ * Get customer by ID
  */
 exports.getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!id || isNaN(id)) {
-      return res.status(400).json({
+    const result = await pool.query(
+      `SELECT id, name, company, email, phone, address, city, state, zip
+       FROM customers 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
         success: false,
-        error: "Valid customer ID is required",
-      });
+        error: "Customer not found",
+      }));
+      return;
     }
 
-    const customer = await woocommerceService.getCustomerById(parseInt(id));
+    const customer = result.rows[0];
 
-    res.json({
+    // Transform data to match frontend expectations
+    const transformedCustomer = {
+      id: customer.id,
+      name: customer.name,
+      company: customer.company,
+      email: customer.email,
+      phone: customer.phone,
+      address: {
+        street: customer.address,
+        city: customer.city,
+        state: customer.state,
+        postcode: customer.zip
+      }
+    };
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: true,
-      data: customer,
-    });
+      data: transformedCustomer,
+    }));
   } catch (error) {
     console.error("Controller error:", error);
-    res.status(500).json({
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
       success: false,
-      error: error.message,
-    });
+      error: "Failed to fetch customer",
+    }));
   }
 };

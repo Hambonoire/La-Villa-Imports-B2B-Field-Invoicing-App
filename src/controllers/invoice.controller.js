@@ -1,107 +1,291 @@
-const invoiceService = require("../services/invoice.service");
+const invoiceNumberManager = require('../utils/invoiceNumberManager');
+const pdfGenerator = require("../services/pdfGenerator");
 
 /**
  * Invoice Controller
- * Handles HTTP requests related to invoices
+ * Handles invoice generation and management
  */
 
-/**
- * Create/generate a new invoice
- * POST /api/invoices
- * Body: { customerId, items: [{productId, quantity, price}], notes, taxRate }
- */
-exports.createInvoice = async (req, res) => {
-  try {
-    const invoiceData = req.body;
-
-    // Generate the invoice
-    const invoice = await invoiceService.generateInvoice(invoiceData);
-
-    // Validate the generated invoice
-    const validation = invoiceService.validateInvoice(invoice);
-
-    if (!validation.valid) {
-      return res.status(400).json({
+class InvoiceController {
+  /**
+   * Get next invoice number
+   */
+  async getNextInvoiceNumber(req, res) {
+    try {
+      const next = invoiceNumberManager.getNextInvoiceNumber();
+      
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          invoiceNumber: next.invoiceNumber,
+          sequenceNumber: next.sequenceNumber
+        }
+      }));
+    } catch (error) {
+      console.error("Get next invoice number error:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
         success: false,
-        errors: validation.errors,
-      });
+        error: `Failed to get next invoice number: ${error.message}`,
+      }));
     }
-
-    res.status(201).json({
-      success: true,
-      data: invoice,
-    });
-  } catch (error) {
-    console.error("Controller error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
   }
-};
 
-/**
- * Get formatted invoice for display
- * POST /api/invoices/preview
- * Body: { customerId, items: [{productId, quantity, price}], notes, taxRate }
- */
-exports.previewInvoice = async (req, res) => {
-  try {
-    const invoiceData = req.body;
+  /**
+   * Preview invoice before generation
+   */
+  async previewInvoice(req, res) {
+    try {
+      console.log("Preview invoice called");
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
 
-    // Generate the invoice
-    const invoice = await invoiceService.generateInvoice(invoiceData);
+      const { customer, items, taxRate, notes, paymentTerms, checkNumber, customInvoiceNumber } =
+        req.body;
 
-    // Format for display
-    const formatted = invoiceService.formatInvoiceForDisplay(invoice);
+      // Validate required fields
+      if (!customer || !items || items.length === 0) {
+        console.log("Validation failed:", { customer, items });
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          error: "Customer information and at least one item are required",
+        }));
+        return;
+      }
 
-    res.json({
-      success: true,
-      data: formatted,
-    });
-  } catch (error) {
-    console.error("Controller error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+      console.log("Validation passed, generating preview...");
+
+      // Generate or use custom invoice number
+      let invoiceNumber;
+      if (customInvoiceNumber) {
+        if (!invoiceNumberManager.validateInvoiceNumber(customInvoiceNumber)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: false,
+            error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
+          }));
+          return;
+        }
+        invoiceNumber = customInvoiceNumber;
+      } else {
+        const next = invoiceNumberManager.getNextInvoiceNumber();
+        invoiceNumber = next.invoiceNumber;
+      }
+
+      const currentDate = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      // Calculate totals
+      const subtotal = items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+      const tax = subtotal * (taxRate || 0);
+      const total = subtotal + tax;
+
+      console.log("Totals calculated:", { subtotal, tax, total });
+
+      // Format preview data
+      const preview = {
+        invoiceNumber,
+        date: currentDate,
+        customer: {
+          name: customer.name,
+          company: customer.company || "",
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+        },
+        items: items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName || "Product",
+          quantity: item.quantity,
+          unitPrice: `$${item.price.toFixed(2)}`,
+          lineTotal: `$${(item.price * item.quantity).toFixed(2)}`,
+        })),
+        subtotal: `$${subtotal.toFixed(2)}`,
+        taxRate: taxRate || 0,
+        taxAmount: `$${tax.toFixed(2)}`,
+        total: `$${total.toFixed(2)}`,
+        notes: notes || "",
+        paymentTerms: paymentTerms || "",
+        checkNumber: checkNumber || "",
+      };
+
+      console.log("Preview generated successfully");
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: true,
+          data: preview,
+        }),
+      );
+    } catch (error) {
+      console.error("Preview invoice error:", error);
+      console.error("Error stack:", error.stack);
+
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to generate preview: ${error.message}`,
+        }),
+      );
+    }
   }
-};
 
-/**
- * Calculate invoice totals without full generation
- * POST /api/invoices/calculate
- * Body: { items: [{productId, quantity, price}], taxRate }
- */
-exports.calculateTotals = async (req, res) => {
-  try {
-    const { items, taxRate = 0 } = req.body;
+  /**
+   * Generate and save invoice
+   */
+  async generateInvoice(req, res) {
+    try {
+      const {
+        customer,
+        items,
+        subtotal,
+        taxRate,
+        taxAmount,
+        total,
+        notes,
+        paymentTerms,
+        checkNumber,
+        customInvoiceNumber,
+      } = req.body;
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({
+      // Validate required fields
+      if (!customer || !items || items.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          error: "Customer information and at least one item are required",
+        }));
+        return;
+      }
+
+      // Generate or use custom invoice number and increment counter
+      let invoiceNumber;
+      if (customInvoiceNumber) {
+        if (!invoiceNumberManager.validateInvoiceNumber(customInvoiceNumber)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: false,
+            error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
+          }));
+          return;
+        }
+        invoiceNumber = customInvoiceNumber;
+      } else {
+        invoiceNumber = invoiceNumberManager.incrementCounter();
+      }
+
+      const currentDate = new Date().toISOString();
+
+      const invoice = {
+        invoiceNumber,
+        date: currentDate,
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          company: customer.company || "",
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+        },
+        items: items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName || "Product",
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+        })),
+        subtotal:
+          subtotal ||
+          items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        taxRate: taxRate || 0,
+        taxAmount: taxAmount || 0,
+        total: total || 0,
+        notes: notes || "",
+        paymentTerms: paymentTerms || "",
+        checkNumber: checkNumber || "",
+        status: "generated",
+        createdAt: new Date(),
+      };
+
+      // Generate PDF
+      console.log("📝 Generating invoice PDF:", invoiceNumber);
+      const { filepath, filename } = await pdfGenerator.generateInvoicePDF(invoice);
+      console.log("✅ PDF generated:", filepath);
+      console.log("Customer:", customer.name);
+      console.log("Total:", `$${invoice.total.toFixed(2)}`);
+      console.log("Payment Terms:", paymentTerms);
+
+      // TODO: Save invoice data to database
+
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          ...invoice,
+          pdfPath: filepath,
+          pdfFilename: filename,
+        },
+      }));
+    } catch (error) {
+      console.error("Generate invoice error:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
         success: false,
-        error: "Items array is required",
-      });
+        error: `Failed to generate invoice: ${error.message}`,
+      }));
     }
-
-    // Build invoice items (fetch product details)
-    const invoiceItems = await invoiceService.buildInvoiceItems(items);
-
-    // Calculate totals
-    const calculations = invoiceService.calculateTotals(invoiceItems, taxRate);
-
-    res.json({
-      success: true,
-      data: {
-        items: invoiceItems,
-        ...calculations,
-      },
-    });
-  } catch (error) {
-    console.error("Controller error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
   }
-};
+
+  /**
+   * Calculate invoice totals
+   */
+  async calculateInvoice(req, res) {
+    try {
+      const { items, taxRate } = req.body;
+
+      if (!items || items.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          error: "At least one item is required",
+        }));
+        return;
+      }
+
+      const subtotal = items.reduce((sum, item) => {
+        return sum + item.price * item.quantity;
+      }, 0);
+
+      const tax = subtotal * (taxRate || 0);
+      const total = subtotal + tax;
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          subtotal: subtotal.toFixed(2),
+          taxAmount: tax.toFixed(2),
+          total: total.toFixed(2),
+        },
+      }));
+    } catch (error) {
+      console.error("Calculate invoice error:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: false,
+        error: `Failed to calculate totals: ${error.message}`,
+      }));
+    }
+  }
+}
+
+module.exports = new InvoiceController();

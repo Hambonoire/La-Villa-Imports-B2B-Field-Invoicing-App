@@ -1,19 +1,18 @@
-const express = require("express");
-const router = express.Router();
-const productController = require("../controllers/product.controller");
-
 /**
  * Product Routes
- * Base path: /api/products
  */
 
-// GET all products
-router.get("/", productController.getAllProducts);
+const router = require("router")();
+const productController = require("../controllers/product.controller");
 
-// GET product by SKU (must come before /:id to avoid conflicts)
-router.get("/sku/:sku", productController.searchBySku);
+// GET all products - /api/products
+router.get("/api/products", (req, res) => {
+  productController.getAllProducts(req, res);
+});
 
-// GET single product by ID
-router.get("/:id", productController.getProductById);
+// GET single product by ID - /api/products/:id
+router.get("/api/products/:id", (req, res) => {
+  productController.getProductById(req, res);
+});
 
 module.exports = router;

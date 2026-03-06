@@ -1,16 +1,18 @@
-const express = require("express");
-const router = express.Router();
-const customerController = require("../controllers/customer.controller");
-
 /**
  * Customer Routes
- * Base path: /api/customers
  */
 
-// GET all customers
-router.get("/", customerController.getAllCustomers);
+const router = require("router")();
+const customerController = require("../controllers/customer.controller");
 
-// GET single customer by ID
-router.get("/:id", customerController.getCustomerById);
+// GET all customers - /api/customers
+router.get("/api/customers", (req, res) => {
+  customerController.getAllCustomers(req, res);
+});
+
+// GET single customer by ID - /api/customers/:id
+router.get("/api/customers/:id", (req, res) => {
+  customerController.getCustomerById(req, res);
+});
 
 module.exports = router;
