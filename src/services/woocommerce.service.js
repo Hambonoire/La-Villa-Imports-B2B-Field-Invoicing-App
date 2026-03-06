@@ -15,30 +15,40 @@ class WooCommerceService {
     try {
       const defaultParams = {
         per_page: 100,
-        role: "customer", // Filter by customer role
+        role: "all", // Filter by all customer roles
         ...params,
       };
 
+      // Remove search param if it's causing issues
+      if (defaultParams.search) {
+        delete defaultParams.search;
+      }
+
       const response = await wc.get("customers", defaultParams);
 
-      return response.data.map((customer) => ({
-        id: customer.id,
-        email: customer.email,
-        firstName: customer.first_name,
-        lastName: customer.last_name,
-        fullName: `${customer.first_name} ${customer.last_name}`,
-        company: customer.billing?.company || "",
-        phone: customer.billing?.phone || "",
-        address: {
-          street: customer.billing?.address_1 || "",
-          street2: customer.billing?.address_2 || "",
-          city: customer.billing?.city || "",
-          state: customer.billing?.state || "",
-          postcode: customer.billing?.postcode || "",
-          country: customer.billing?.country || "",
-        },
-        metadata: customer.meta_data || [],
-      }));
+      return response.data
+        .filter((customer) => {
+          // Only include customers with actual names
+          return customer.first_name && customer.last_name;
+        })
+        .map((customer) => ({
+          id: customer.id,
+          email: customer.email,
+          firstName: customer.first_name,
+          lastName: customer.last_name,
+          fullName: `${customer.first_name} ${customer.last_name}`,
+          company: customer.billing?.company || "",
+          phone: customer.billing?.phone || "",
+          address: {
+            street: customer.billing?.address_1 || "",
+            street2: customer.billing?.address_2 || "",
+            city: customer.billing?.city || "",
+            state: customer.billing?.state || "",
+            postcode: customer.billing?.postcode || "",
+            country: customer.billing?.country || "",
+          },
+          metadata: customer.meta_data || [],
+        }));
     } catch (error) {
       console.error(
         "Error fetching customers:",
