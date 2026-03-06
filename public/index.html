@@ -37,6 +37,13 @@
               <button id="searchCustomerBtn" class="customer-lookup__button">
                 Search
               </button>
+              <button
+                id="loadAllCustomersBtn"
+                class="customer-lookup__button"
+                style="background-color: #2c5f2d"
+              >
+                Load All
+              </button>
             </div>
             <div id="customerResults" class="customer-results"></div>
           </div>
@@ -195,41 +202,35 @@
               />
             </div>
 
-            <div class="invoice-details__field">
-              <label for="notes" class="invoice-details__label"
-                >Invoice Notes (Optional)</label
-              >
-              <textarea
-                id="notes"
-                class="invoice-details__textarea"
-                rows="3"
-                placeholder="Add delivery instructions, payment terms, or other notes..."
-              ></textarea>
-            </div>
-          </div>
-        </section>
-
-        <!-- Step 3: Invoice Details -->
-        <section class="section section--details">
-          <h2 class="section__title">3. Invoice Details</h2>
-
-          <div class="invoice-details">
-            <div class="invoice-details__field">
-              <label for="taxRate" class="invoice-details__label"
-                >Tax Rate (%)</label
-              >
-              <input
-                type="number"
-                id="taxRate"
-                class="invoice-details__input"
-                value="8.0"
-                step="0.1"
-                min="0"
-                max="100"
-              />
-            </div>
-
             <!-- Payment Terms -->
+            <!-- Invoice Number -->
+            <div class="invoice-details__field">
+              <label class="invoice-details__label">Invoice Number *</label>
+              <div style="display: flex; gap: 10px; align-items: flex-start;">
+                <div style="flex: 1;">
+                  <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <input type="radio" name="invoiceNumberOption" value="auto" checked>
+                    <span>Auto-generate (Next: <span id="nextInvoiceNumber" style="font-weight: bold; color: #8B4513;">Loading...</span>)</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="radio" name="invoiceNumberOption" value="custom">
+                    <span>Custom</span>
+                  </label>
+                </div>
+                <div style="flex: 1;">
+                  <input
+                    type="text"
+                    id="customInvoiceNumber"
+                    class="invoice-details__input"
+                    placeholder="INV-YYYYMMDD-XXX"
+                    disabled
+                    style="width: 100%;"
+                  />
+                  <small style="color: #666; font-size: 12px;">Format: INV-20260305-001</small>
+                </div>
+              </div>
+            </div>
+
             <div class="invoice-details__field">
               <label for="paymentTerms" class="invoice-details__label"
                 >Payment Terms *</label
@@ -279,6 +280,23 @@
         <!-- Step 4: Invoice Summary -->
         <section class="section section--summary">
           <h2 class="section__title">Invoice Summary</h2>
+
+          <!-- Payment Terms Display -->
+          <div
+            id="paymentTermsDisplay"
+            class="payment-terms"
+            style="display: none"
+          >
+            <span class="payment-terms__label">Payment Terms:</span>
+            <div class="payment-terms__value" id="paymentTermsText">
+              Not selected
+            </div>
+            <div
+              id="checkNumberDisplay"
+              class="payment-terms__check-number"
+              style="display: none"
+            ></div>
+          </div>
 
           <div class="invoice-summary">
             <div class="invoice-summary__row">

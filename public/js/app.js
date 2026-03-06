@@ -29,6 +29,10 @@ const elements = {
   // Invoice items
   itemsList: document.getElementById("itemsList"),
 
+  // Invoice number
+  invoiceNumberRadios: document.getElementsByName("invoiceNumberOption"),
+  nextInvoiceNumber: document.getElementById("nextInvoiceNumber"),
+  customInvoiceNumber: document.getElementById("customInvoiceNumber"),
   // Invoice details
   taxRate: document.getElementById("taxRate"),
   taxRateDisplay: document.getElementById("taxRateDisplay"),
@@ -76,6 +80,9 @@ function init() {
   // Initial UI update
   updateUI();
 
+  // Load next invoice number
+  loadNextInvoiceNumber();
+
   console.log("La Villa Invoice App initialized");
 }
 
@@ -88,6 +95,11 @@ function setupEventListeners() {
   elements.customerLookup.addEventListener("keypress", (e) => {
     if (e.key === "Enter") handleCustomerSearch();
   });
+
+  const loadAllBtn = document.getElementById("loadAllCustomersBtn");
+  if (loadAllBtn) {
+    loadAllBtn.addEventListener("click", handleLoadAllCustomers);
+  }
 
   // Product search
   elements.searchProductBtn.addEventListener("click", handleProductSearch);
@@ -109,6 +121,11 @@ function setupEventListeners() {
   elements.paymentTerms.addEventListener("change", handlePaymentTermsChange);
   elements.checkNumber.addEventListener("input", handleCheckNumberChange);
 
+  // Invoice number radio buttons
+  elements.invoiceNumberRadios.forEach((radio) => {
+    radio.addEventListener("change", handleInvoiceNumberChange);
+  });
+
   // Actions
   elements.clearFormBtn.addEventListener("click", handleClearForm);
   elements.previewBtn.addEventListener("click", handlePreview);
@@ -124,7 +141,7 @@ function setupEventListeners() {
  * Handle customer search
  */
 async function handleCustomerSearch() {
-  const searchTerm = elements.customerLookup.value.trim();
+  const searchTerm = elements.customerLookup.value.trim().toLowerCase();
 
   if (!searchTerm) {
     alert("Please enter a search term");
@@ -134,8 +151,37 @@ async function handleCustomerSearch() {
   showLoading(true);
 
   try {
-    const response = await apiClient.searchCustomers(searchTerm);
-    displayCustomerResults(response.data);
+    // Load all customers and filter on frontend
+    const response = await apiClient.get("/api/customers");
+
+    if (response.data.length === 0) {
+      elements.customerResults.innerHTML =
+        '<p class="customer-results__empty">No customers found in WooCommerce</p>';
+      showLoading(false);
+      return;
+    }
+
+    // Filter customers by search term (name, company, email)
+    const filteredCustomers = response.data.filter((customer) => {
+      const fullName = (customer.name || "").toLowerCase();
+      const company = (customer.company || "").toLowerCase();
+      const email = (customer.email || "").toLowerCase();
+
+      // Only match if search term is found in non-empty strings
+      return (
+        (fullName && fullName.includes(searchTerm)) ||
+        (company && company.includes(searchTerm)) ||
+        (email && email.includes(searchTerm))
+      );
+    });
+
+    if (filteredCustomers.length === 0) {
+      elements.customerResults.innerHTML = `<p class="customer-results__empty">No customers found matching "${searchTerm}"</p>`;
+      showLoading(false);
+      return;
+    }
+
+    displayCustomerResults(filteredCustomers);
   } catch (error) {
     alert("Error searching customers: " + error.message);
   } finally {
@@ -157,7 +203,7 @@ function displayCustomerResults(customers) {
     .map(
       (customer) => `
     <div class="customer-results__item" onclick="selectCustomer(${customer.id})">
-      <div class="customer-results__name">${customer.fullName}</div>
+      <div class="customer-results__name">${customer.name}</div>
       ${customer.company ? `<div class="customer-results__company">${customer.company}</div>` : ""}
       <div class="customer-results__contact">
         <span class="customer-results__email">${customer.email}</span>
@@ -167,6 +213,30 @@ function displayCustomerResults(customers) {
   `,
     )
     .join("");
+}
+
+/**
+ * Load all customers
+ */
+async function handleLoadAllCustomers() {
+  showLoading(true);
+
+  try {
+    const response = await apiClient.get("/api/customers");
+
+    if (response.data.length === 0) {
+      alert(
+        "No customers found in WooCommerce. Please add customers first or enter customer details manually.",
+      );
+      return;
+    }
+
+    displayCustomerResults(response.data);
+  } catch (error) {
+    alert("Error loading customers: " + error.message);
+  } finally {
+    showLoading(false);
+  }
 }
 
 /**
@@ -181,7 +251,7 @@ async function selectCustomer(customerId) {
 
     // Populate form fields
     elements.customerId.value = customer.id;
-    elements.customerName.value = customer.fullName;
+    elements.customerName.value = customer.name;
     elements.customerCompany.value = customer.company || "";
     elements.customerEmail.value = customer.email;
     elements.customerPhone.value = customer.phone;
@@ -193,7 +263,7 @@ async function selectCustomer(customerId) {
     // Set customer in invoice builder
     invoiceBuilder.setCustomer({
       id: customer.id,
-      name: customer.fullName,
+      name: customer.name,
       company: customer.company,
       email: customer.email,
       phone: customer.phone,
@@ -411,6 +481,12 @@ function updateTotals() {
 function updatePaymentTermsDisplay() {
   const terms = invoiceBuilder.state.paymentTerms;
 
+  // Add null checks
+  if (!elements.paymentTermsDisplay || !elements.paymentTermsText) {
+    console.warn("Payment terms display element not found");
+    return;
+  }
+
   if (!terms) {
     elements.paymentTermsDisplay.style.display = "none";
     return;
@@ -426,10 +502,14 @@ function updatePaymentTermsDisplay() {
 
   elements.paymentTermsText.textContent = termsLabels[terms] || terms;
 
-  if (terms === "check" && invoiceBuilder.state.checkNumber) {
+  if (
+    terms === "check" &&
+    invoiceBuilder.state.checkNumber &&
+    elements.checkNumberDisplay
+  ) {
     elements.checkNumberDisplay.textContent = `Check #: ${invoiceBuilder.state.checkNumber}`;
     elements.checkNumberDisplay.style.display = "block";
-  } else {
+  } else if (elements.checkNumberDisplay) {
     elements.checkNumberDisplay.style.display = "none";
   }
 }
@@ -473,6 +553,12 @@ async function handlePreview() {
 
   try {
     const invoiceData = invoiceBuilder.getInvoiceData();
+    console.log("Invoice data:", invoiceData);
+    const customInvoiceNumber = getInvoiceNumber();
+    console.log("Custom invoice number:", customInvoiceNumber);
+    if (customInvoiceNumber) {
+      invoiceData.customInvoiceNumber = customInvoiceNumber;
+    }
     const response = await apiClient.previewInvoice(invoiceData);
 
     displayInvoicePreview(response.data);
@@ -510,8 +596,8 @@ function displayInvoicePreview(invoice) {
       <div style="margin-bottom: 20px;">
         <h4 style="color: #666;">Invoice Details</h4>
         <p><strong>Date:</strong> ${invoice.date}</p>
-        <p><strong>Payment Terms:</strong> ${termsLabels[invoiceData.paymentTerms]}</p>
-        ${invoiceData.paymentTerms === "check" ? `<p><strong>Check Number:</strong> ${invoiceData.checkNumber}</p>` : ""}
+        <p><strong>Payment Terms:</strong> ${termsLabels[invoiceBuilder.state.paymentTerms]}</p>
+        ${invoiceBuilder.state.paymentTerms === "check" ? `<p><strong>Check Number:</strong> ${invoiceBuilder.state.checkNumber}</p>` : ""}
       </div>
       
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -574,10 +660,19 @@ async function handleGenerate() {
 
   try {
     const invoiceData = invoiceBuilder.getInvoiceData();
+    console.log("Invoice data:", invoiceData);
+    
+    // Get custom invoice number BEFORE calling API
+    const customInvoiceNumber = getInvoiceNumber();
+    console.log("Custom invoice number:", customInvoiceNumber);
+    if (customInvoiceNumber) {
+      invoiceData.customInvoiceNumber = customInvoiceNumber;
+    }
+    
     const response = await apiClient.generateInvoice(invoiceData);
-
+    
     alert(
-      `Invoice generated successfully!\nInvoice Number: ${response.data.invoiceNumber}`,
+      "Invoice generated successfully!\nInvoice Number: " + response.data.invoiceNumber
     );
 
     // Clear form after successful generation
@@ -619,7 +714,66 @@ function showLoading(show) {
 window.selectCustomer = selectCustomer;
 window.addProduct = addProduct;
 window.changeQuantity = changeQuantity;
-window.removeItem = removeItem;
+/**
+ * Load next invoice number from API
+ */
+async function loadNextInvoiceNumber() {
+  try {
+    const response = await apiClient.getNextInvoiceNumber();
+    elements.nextInvoiceNumber.textContent = response.data.invoiceNumber;
+  } catch (error) {
+    console.error("Error loading next invoice number:", error);
+    elements.nextInvoiceNumber.textContent = "Error loading";
+  }
+}
+
+/**
+ * Handle invoice number radio change
+ */
+function handleInvoiceNumberChange() {
+  const selectedOption = Array.from(elements.invoiceNumberRadios).find(
+    (radio) => radio.checked,
+  ).value;
+
+  if (selectedOption === "custom") {
+    elements.customInvoiceNumber.disabled = false;
+    elements.customInvoiceNumber.focus();
+  } else {
+    elements.customInvoiceNumber.disabled = true;
+    elements.customInvoiceNumber.value = "";
+  }
+}
+
+/**
+ * Get invoice number for submission
+ */
+function getInvoiceNumber() {
+  const selectedOption = Array.from(elements.invoiceNumberRadios).find(
+    (radio) => radio.checked,
+  ).value;
+
+  if (selectedOption === "custom") {
+    const customValue = elements.customInvoiceNumber.value.trim();
+    if (!customValue) return null;
+
+    // If user enters just a number, format it properly
+    if (/^\d+$/.test(customValue)) {
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+      return `INV-${dateStr}-${customValue.padStart(3, "0")}`;
+    }
+
+    // Otherwise validate the full format
+    if (!/^INV-\d{8}-\d{1,6}$/.test(customValue)) {
+      throw new Error(
+        "Custom invoice number must be in format: INV-YYYYMMDD-XXXXXX or just a number",
+      );
+    }
+
+    return customValue;
+  }
+  return null; // Auto-generate on backend
+}
 
 // Initialize app when DOM is ready
 if (document.readyState === "loading") {

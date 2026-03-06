@@ -156,6 +156,7 @@ const invoiceBuilder = {
       customer: this.state.customer,
       items: this.state.items.map((item) => ({
         productId: item.productId,
+        productName: item.productName,
         quantity: item.quantity,
         price: item.price,
       })),

@@ -1,109 +1,74 @@
-/**
- * API Client
- * Handles all HTTP requests to the backend API
- */
-
-const API_BASE_URL = "http://localhost:4000/api";
-
 const apiClient = {
-  /**
-   * Generic GET request
-   */
   async get(endpoint) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Request failed");
-      }
-
-      return data;
-    } catch (error) {
-      console.error("API GET Error:", error);
-      throw error;
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      console.error('API Error:', error);
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
+    return response.json();
+  },
+
+  async post(endpoint, data) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      console.error('API Error:', error);
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
   },
 
   /**
-   * Generic POST request
+   * Get next invoice number
    */
-  async post(endpoint, body) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Request failed");
-      }
-
-      return data;
-    } catch (error) {
-      console.error("API POST Error:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Search customers
-   */
-  async searchCustomers(searchTerm) {
-    return this.get(`/customers?search=${encodeURIComponent(searchTerm)}`);
+  async getNextInvoiceNumber() {
+    return this.get("/api/invoices/next-number");
   },
 
   /**
    * Get customer by ID
    */
   async getCustomer(customerId) {
-    return this.get(`/customers/${customerId}`);
-  },
-
-  /**
-   * Search products
-   */
-  async searchProducts(searchTerm) {
-    return this.get(`/products?search=${encodeURIComponent(searchTerm)}`);
+    return this.get(`/api/customers/${customerId}`);
   },
 
   /**
    * Get all products
    */
   async getAllProducts() {
-    return this.get("/products");
+    return this.get("/api/products");
   },
 
   /**
    * Get product by ID
    */
   async getProduct(productId) {
-    return this.get(`/products/${productId}`);
+    return this.get(`/api/products/${productId}`);
   },
 
   /**
    * Calculate invoice totals
    */
-  async calculateInvoice(items, taxRate) {
-    return this.post("/invoices/calculate", { items, taxRate });
+  async calculateInvoice(data) {
+    return this.post("/api/invoices/calculate", data);
   },
 
   /**
-   * Preview invoice
+   * Preview invoice PDF
    */
-  async previewInvoice(invoiceData) {
-    return this.post("/invoices/preview", invoiceData);
+  async previewInvoice(data) {
+    return this.post("/api/invoices/preview", data);
   },
 
   /**
-   * Generate final invoice
+   * Generate and save invoice
    */
-  async generateInvoice(invoiceData) {
-    return this.post("/invoices", invoiceData);
+  async generateInvoice(data) {
+    return this.post("/api/invoices", data);
   },
 };
