@@ -36,4 +36,5 @@ tmp/
 .cache/
 
 generated-invoices/
-*.pdf
+*.pdf*.backup
+*.db
