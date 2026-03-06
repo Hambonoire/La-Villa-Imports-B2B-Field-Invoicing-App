@@ -62,6 +62,11 @@ const invoiceController = require("./src/controllers/invoice.controller");
 router.use(customerRoutes);
 router.use(productRoutes);
 
+// Get invoice PDF for viewing/printing
+router.get("/api/invoices/pdf/:invoiceNumber", (req, res) => {
+  invoiceController.getInvoicePDF(req, res);
+});
+
 // Register invoice routes
 router.get("/api/invoices/next-number", (req, res) => {
   invoiceController.getNextInvoiceNumber(req, res);

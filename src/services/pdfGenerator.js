@@ -33,7 +33,13 @@ class PDFGenerator {
         // Invoice Title and Number
         doc.fontSize(24).text("INVOICE", 400, 50);
         doc.fontSize(12).text(`#${invoice.invoiceNumber}`, 400, 80);
-        doc.fontSize(10).text(`Date: ${new Date(invoice.date).toLocaleDateString()}`, 400, 100);
+        doc
+          .fontSize(10)
+          .text(
+            `Date: ${new Date(invoice.date).toLocaleDateString()}`,
+            400,
+            100,
+          );
 
         // Customer Information
         doc.fontSize(12).text("Bill To:", 50, 150);
@@ -61,14 +67,17 @@ class PDFGenerator {
         doc.text("Qty", 300, itemY);
         doc.text("Price", 360, itemY);
         doc.text("Total", 450, itemY);
-        
+
         // Horizontal line under headers
-        doc.moveTo(50, itemY + 15).lineTo(550, itemY + 15).stroke();
+        doc
+          .moveTo(50, itemY + 15)
+          .lineTo(550, itemY + 15)
+          .stroke();
 
         // Items
         doc.font("Helvetica");
         let yPosition = itemY + 25;
-        
+
         invoice.items.forEach((item) => {
           doc.text(item.productName, 50, yPosition, { width: 240 });
           doc.text(item.quantity.toString(), 300, yPosition);
@@ -89,7 +98,11 @@ class PDFGenerator {
         yPosition += 20;
 
         if (invoice.taxRate > 0) {
-          doc.text(`Tax (${(invoice.taxRate * 100).toFixed(1)}%):`, totalsX, yPosition);
+          doc.text(
+            `Tax (${(invoice.taxRate * 100).toFixed(1)}%):`,
+            totalsX,
+            yPosition,
+          );
           doc.text(`$${invoice.taxAmount.toFixed(2)}`, 480, yPosition);
           yPosition += 20;
         }
@@ -104,7 +117,7 @@ class PDFGenerator {
           doc.font("Helvetica").fontSize(10);
           doc.text("Payment Terms:", 50, yPosition);
           doc.text(invoice.paymentTerms.toUpperCase(), 150, yPosition);
-          
+
           if (invoice.paymentTerms === "check" && invoice.checkNumber) {
             yPosition += 15;
             doc.text("Check Number:", 50, yPosition);
@@ -123,12 +136,14 @@ class PDFGenerator {
         }
 
         // Footer
-        doc.fontSize(8).text(
-          "Thank you for your business!",
-          50,
-          doc.page.height - 50,
-          { align: "center", width: 500 }
-        );
+        doc.moveDown(2);
+        const pageWidth = doc.page.width - 100; // Total width minus margins
+        doc
+          .fontSize(8)
+          .text("Thank you for your business!", 50, doc.y, {
+            align: "center",
+            width: pageWidth,
+          });
 
         // Finalize PDF
         doc.end();

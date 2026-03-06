@@ -661,22 +661,61 @@ async function handleGenerate() {
   try {
     const invoiceData = invoiceBuilder.getInvoiceData();
     console.log("Invoice data:", invoiceData);
-    
+
     // Get custom invoice number BEFORE calling API
     const customInvoiceNumber = getInvoiceNumber();
     console.log("Custom invoice number:", customInvoiceNumber);
     if (customInvoiceNumber) {
       invoiceData.customInvoiceNumber = customInvoiceNumber;
     }
-    
-    const response = await apiClient.generateInvoice(invoiceData);
-    
-    alert(
-      "Invoice generated successfully!\nInvoice Number: " + response.data.invoiceNumber
-    );
 
-    // Clear form after successful generation
-    handleClearForm();
+    const response = await apiClient.generateInvoice(invoiceData);
+
+    // Show success notification with buttons
+    const result = response;
+    if (result.success) {
+      alert(`Invoice ${result.data.invoiceNumber} generated successfully!`);
+
+      // Get the invoice actions container
+      const actionsContainer = document.querySelector(".invoice-actions");
+
+      // Create button container
+      const buttonContainer = document.createElement("div");
+      buttonContainer.style.marginTop = "1rem";
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.gap = "1rem";
+      buttonContainer.className = "invoice-success-buttons";
+
+      // Print button
+      const printBtn = document.createElement("button");
+      printBtn.textContent = "🖨️ Print Invoice";
+      printBtn.className =
+        "invoice-actions__button invoice-actions__button--primary";
+      printBtn.onclick = () => {
+        window.open(`/api/invoices/pdf/${result.data.invoiceNumber}`, "_blank");
+      };
+
+      // Download button
+      const downloadBtn = document.createElement("button");
+      downloadBtn.textContent = "📥 Download PDF";
+      downloadBtn.className =
+        "invoice-actions__button invoice-actions__button--primary";
+      downloadBtn.onclick = () => {
+        const link = document.createElement("a");
+        link.href = `/api/invoices/pdf/${result.data.invoiceNumber}`;
+        link.download = `${result.data.invoiceNumber}.pdf`;
+        link.click();
+      };
+
+      buttonContainer.appendChild(printBtn);
+      buttonContainer.appendChild(downloadBtn);
+      actionsContainer.appendChild(buttonContainer);
+
+      // Reset form after 5 seconds
+      setTimeout(() => {
+        buttonContainer.remove();
+      }, 5000);
+    }
   } catch (error) {
     alert("Error generating invoice: " + error.message);
   } finally {

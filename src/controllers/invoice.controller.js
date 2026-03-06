@@ -1,4 +1,6 @@
-const invoiceNumberManager = require('../utils/invoiceNumberManager');
+const path = require("path");
+const fs = require("fs");
+const invoiceNumberManager = require("../utils/invoiceNumberManager");
 const pdfGenerator = require("../services/pdfGenerator");
 
 /**
@@ -13,22 +15,26 @@ class InvoiceController {
   async getNextInvoiceNumber(req, res) {
     try {
       const next = invoiceNumberManager.getNextInvoiceNumber();
-      
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: true,
-        data: {
-          invoiceNumber: next.invoiceNumber,
-          sequenceNumber: next.sequenceNumber
-        }
-      }));
+      res.end(
+        JSON.stringify({
+          success: true,
+          data: {
+            invoiceNumber: next.invoiceNumber,
+            sequenceNumber: next.sequenceNumber,
+          },
+        }),
+      );
     } catch (error) {
       console.error("Get next invoice number error:", error);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: false,
-        error: `Failed to get next invoice number: ${error.message}`,
-      }));
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to get next invoice number: ${error.message}`,
+        }),
+      );
     }
   }
 
@@ -40,17 +46,26 @@ class InvoiceController {
       console.log("Preview invoice called");
       console.log("Request body:", JSON.stringify(req.body, null, 2));
 
-      const { customer, items, taxRate, notes, paymentTerms, checkNumber, customInvoiceNumber } =
-        req.body;
+      const {
+        customer,
+        items,
+        taxRate,
+        notes,
+        paymentTerms,
+        checkNumber,
+        customInvoiceNumber,
+      } = req.body;
 
       // Validate required fields
       if (!customer || !items || items.length === 0) {
         console.log("Validation failed:", { customer, items });
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          success: false,
-          error: "Customer information and at least one item are required",
-        }));
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: "Customer information and at least one item are required",
+          }),
+        );
         return;
       }
 
@@ -61,10 +76,12 @@ class InvoiceController {
       if (customInvoiceNumber) {
         if (!invoiceNumberManager.validateInvoiceNumber(customInvoiceNumber)) {
           res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({
-            success: false,
-            error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
-          }));
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
+            }),
+          );
           return;
         }
         invoiceNumber = customInvoiceNumber;
@@ -160,10 +177,12 @@ class InvoiceController {
       // Validate required fields
       if (!customer || !items || items.length === 0) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          success: false,
-          error: "Customer information and at least one item are required",
-        }));
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: "Customer information and at least one item are required",
+          }),
+        );
         return;
       }
 
@@ -172,10 +191,12 @@ class InvoiceController {
       if (customInvoiceNumber) {
         if (!invoiceNumberManager.validateInvoiceNumber(customInvoiceNumber)) {
           res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({
-            success: false,
-            error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
-          }));
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: "Invalid invoice number format. Use: INV-YYYYMMDD-XXXXXX",
+            }),
+          );
           return;
         }
         invoiceNumber = customInvoiceNumber;
@@ -218,7 +239,8 @@ class InvoiceController {
 
       // Generate PDF
       console.log("📝 Generating invoice PDF:", invoiceNumber);
-      const { filepath, filename } = await pdfGenerator.generateInvoicePDF(invoice);
+      const { filepath, filename } =
+        await pdfGenerator.generateInvoicePDF(invoice);
       console.log("✅ PDF generated:", filepath);
       console.log("Customer:", customer.name);
       console.log("Total:", `$${invoice.total.toFixed(2)}`);
@@ -227,21 +249,83 @@ class InvoiceController {
       // TODO: Save invoice data to database
 
       res.writeHead(201, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: true,
-        data: {
-          ...invoice,
-          pdfPath: filepath,
-          pdfFilename: filename,
-        },
-      }));
+      res.end(
+        JSON.stringify({
+          success: true,
+          data: {
+            ...invoice,
+            pdfPath: filepath,
+            pdfFilename: filename,
+          },
+        }),
+      );
     } catch (error) {
       console.error("Generate invoice error:", error);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: false,
-        error: `Failed to generate invoice: ${error.message}`,
-      }));
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to generate invoice: ${error.message}`,
+        }),
+      );
+    }
+  }
+
+  /**
+   * Get invoice PDF for viewing/printing
+   */
+  async getInvoicePDF(req, res) {
+    try {
+      const { invoiceNumber } = req.params;
+
+      if (!invoiceNumber) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: "Invoice number is required",
+          }),
+        );
+        return;
+      }
+
+      const filepath = path.join(
+        process.cwd(),
+        "invoices",
+        `${invoiceNumber}.pdf`,
+      );
+
+      // Check if file exists
+      if (!fs.existsSync(filepath)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: "Invoice not found",
+          }),
+        );
+        return;
+      }
+
+      // Serve the PDF file
+      const stat = fs.statSync(filepath);
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Length": stat.size,
+        "Content-Disposition": `inline; filename="${invoiceNumber}.pdf"`,
+      });
+
+      const readStream = fs.createReadStream(filepath);
+      readStream.pipe(res);
+    } catch (error) {
+      console.error("Get invoice PDF error:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to retrieve invoice: ${error.message}`,
+        }),
+      );
     }
   }
 
@@ -254,10 +338,12 @@ class InvoiceController {
 
       if (!items || items.length === 0) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          success: false,
-          error: "At least one item is required",
-        }));
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: "At least one item is required",
+          }),
+        );
         return;
       }
 
@@ -269,21 +355,25 @@ class InvoiceController {
       const total = subtotal + tax;
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: true,
-        data: {
-          subtotal: subtotal.toFixed(2),
-          taxAmount: tax.toFixed(2),
-          total: total.toFixed(2),
-        },
-      }));
+      res.end(
+        JSON.stringify({
+          success: true,
+          data: {
+            subtotal: subtotal.toFixed(2),
+            taxAmount: tax.toFixed(2),
+            total: total.toFixed(2),
+          },
+        }),
+      );
     } catch (error) {
       console.error("Calculate invoice error:", error);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        success: false,
-        error: `Failed to calculate totals: ${error.message}`,
-      }));
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: `Failed to calculate totals: ${error.message}`,
+        }),
+      );
     }
   }
 }
