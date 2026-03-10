@@ -31,6 +31,22 @@ const invoiceBuilder = {
   },
 
   /**
+   * Reset state to defaults
+   */
+  reset() {
+    this.state = {
+      customer: null,
+      items: [],
+      taxRate: 8.0,
+      notes: "",
+      paymentTerms: null,
+      checkNumber: null,
+      invoiceNumber: null,
+    };
+    this.notifyStateChange();
+  },
+
+  /**
    * Add product to cart
    */
   addItem(product) {

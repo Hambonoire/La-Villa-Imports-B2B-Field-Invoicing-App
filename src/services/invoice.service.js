@@ -1,4 +1,5 @@
 const woocommerceService = require("./woocommerce.service");
+const invoiceNumberManager = require("../utils/invoiceNumberManager");
 
 /**
  * Invoice Service
@@ -35,7 +36,7 @@ class InvoiceService {
 
       // Build complete invoice object
       const invoice = {
-        invoiceNumber: this.generateInvoiceNumber(),
+        invoiceNumber: invoiceNumberManager.incrementCounter(),
         date: new Date().toISOString(),
         status: "draft",
         customer: {

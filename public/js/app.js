@@ -70,6 +70,91 @@ const elements = {
 /**
  * Initialize application
  */
+
+/**
+ * Collect current form data for auto-save
+ */
+function collectFormData() {
+  return {
+    customer: invoiceBuilder.state.customer || null,
+    items: invoiceBuilder.state.items || [],
+    notes: document.getElementById("invoiceNotes")?.value || "",
+    paymentTerms: document.getElementById("paymentTerms")?.value || "",
+    invoiceNumberOption:
+      Array.from(elements.invoiceNumberRadios).find((r) => r.checked)?.value ||
+      "auto",
+    customInvoiceNumber: elements.customInvoiceNumber?.value || "",
+  };
+}
+
+/**
+ * Restore draft data to form
+ */
+function restoreDraft(data) {
+  try {
+    // Restore customer
+    if (data.customer) {
+      const c = data.customer;
+      elements.customerId.value = c.id || "";
+      elements.customerName.value = c.name || "";
+      elements.customerCompany.value = c.company || "";
+      elements.customerEmail.value = c.email || "";
+      elements.customerPhone.value = c.phone || "";
+      if (c.address) {
+        elements.customerAddress.value = c.address.street || "";
+        elements.customerCity.value = c.address.city || "";
+        elements.customerState.value = c.address.state || "";
+        elements.customerZip.value = c.address.postcode || "";
+      }
+      invoiceBuilder.setCustomer(c);
+      handleStateChange();
+    }
+
+    // Restore items
+    if (data.items && data.items.length > 0) {
+      data.items.forEach((item) => {
+        invoiceBuilder.state.items.push(item);
+      });
+      handleStateChange();
+    }
+
+    // Restore notes
+    if (data.notes) {
+      const notesEl = document.getElementById("invoiceNotes");
+      if (notesEl) notesEl.value = data.notes;
+      invoiceBuilder.setNotes(data.notes);
+    }
+
+    // Restore payment terms
+    if (data.paymentTerms) {
+      const termsEl = document.getElementById("paymentTerms");
+      if (termsEl) {
+        termsEl.value = data.paymentTerms;
+        invoiceBuilder.setPaymentTerms(
+          data.paymentTerms,
+          data.checkNumber || "",
+        );
+      }
+    }
+
+    // Restore invoice number option
+    if (data.invoiceNumberOption === "custom" && data.customInvoiceNumber) {
+      const customRadio = Array.from(elements.invoiceNumberRadios).find(
+        (r) => r.value === "custom",
+      );
+      if (customRadio) {
+        customRadio.checked = true;
+        elements.customInvoiceNumber.disabled = false;
+        elements.customInvoiceNumber.value = data.customInvoiceNumber;
+      }
+    }
+
+    console.log("📝 Draft restored successfully");
+  } catch (error) {
+    console.error("Error restoring draft:", error);
+  }
+}
+
 function init() {
   // Set up event listeners
   setupEventListeners();
@@ -85,6 +170,13 @@ function init() {
 
   // Load last custom invoice number for placeholder
   loadLastCustomNumber(); // ADD THIS LINE
+
+  // Check for and restore draft on page load
+  const recovered = storageManager.promptDraftRecovery();
+  if (recovered) restoreDraft(recovered);
+
+  // Start auto-save every 30 seconds
+  storageManager.startAutosave(collectFormData);
 
   console.log("La Villa Invoice App initialized");
 }
@@ -694,21 +786,31 @@ async function handleGenerate() {
 
     if (result.success) {
       invoiceBuilder.state.invoiceNumber = response.data.invoiceNumber;
-      console.log("Full invoice data:", invoiceBuilder.getInvoiceData());
-
       alert(`Invoice ${result.data.invoiceNumber} generated successfully!`);
 
-      // Get the invoice actions container
-      const actionsContainer = document.querySelector(".invoice-actions");
+      // Clear draft
+      storageManager.clearDraft();
+      storageManager.stopAutosave();
 
-      // Create button container
+      // Reset form and refresh invoice number displays
+      invoiceBuilder.reset();
+      await loadNextInvoiceNumber();
+      elements.customInvoiceNumber.placeholder = `Last invoice: ${result.data.invoiceNumber}`;
+
+      // Hide Generate and Preview buttons
+      const generateBtn = document.getElementById("generateBtn");
+      const previewBtn = document.getElementById("previewBtn");
+      if (generateBtn) generateBtn.style.display = "none";
+      if (previewBtn) previewBtn.style.display = "none";
+
+      // Build success button container
+      const actionsContainer = document.querySelector(".invoice-actions");
       const buttonContainer = document.createElement("div");
       buttonContainer.style.marginTop = "1rem";
       buttonContainer.style.display = "flex";
       buttonContainer.style.gap = "1rem";
       buttonContainer.className = "invoice-success-buttons";
 
-      // Print button
       const printBtn = document.createElement("button");
       printBtn.textContent = "🖨️ Print Invoice";
       printBtn.className =
@@ -717,7 +819,6 @@ async function handleGenerate() {
         window.open(`/api/invoices/pdf/${result.data.invoiceNumber}`, "_blank");
       };
 
-      // Download button
       const downloadBtn = document.createElement("button");
       downloadBtn.textContent = "📥 Download PDF";
       downloadBtn.className =
@@ -729,13 +830,14 @@ async function handleGenerate() {
         link.click();
       };
 
-      // Close button
       const closeBtn = document.createElement("button");
       closeBtn.textContent = "✖ Close";
       closeBtn.className =
         "invoice-actions__button invoice-actions__button--secondary";
       closeBtn.onclick = () => {
         buttonContainer.remove();
+        if (generateBtn) generateBtn.style.display = "";
+        if (previewBtn) previewBtn.style.display = "";
       };
 
       buttonContainer.appendChild(printBtn);
@@ -789,7 +891,8 @@ async function loadNextInvoiceNumber() {
     elements.nextInvoiceNumber.textContent = response.data.invoiceNumber;
     // Update format hint with current date
     const formatHint = document.querySelector(".invoice-details__field small");
-    if (formatHint) formatHint.textContent = `Format: ${response.data.invoiceNumber}`;
+    if (formatHint)
+      formatHint.textContent = `Format: ${response.data.invoiceNumber}`;
   } catch (error) {
     console.error("Error loading next invoice number:", error);
     elements.nextInvoiceNumber.textContent = "Error loading";
@@ -803,15 +906,15 @@ async function loadLastCustomNumber() {
   try {
     const response = await apiClient.getLastCustomNumber();
     if (response.success && response.data.lastCustomNumber) {
-      elements.customInvoiceNumber.placeholder = `Last used: ${response.data.lastCustomNumber}`;
+      elements.customInvoiceNumber.placeholder = `Last invoice: ${response.data.lastCustomNumber}`;
     } else {
       elements.customInvoiceNumber.placeholder =
-        "e.g., INV-20260306-001 (optional)";
+        "Last invoice number will display here";
     }
   } catch (error) {
     console.error("Error loading last custom invoice number:", error);
     elements.customInvoiceNumber.placeholder =
-      "e.g., INV-20260306-001 (optional)";
+      "Last invoice number will display here";
   }
 }
 

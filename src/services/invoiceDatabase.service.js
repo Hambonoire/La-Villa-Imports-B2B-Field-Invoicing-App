@@ -73,10 +73,9 @@ class InvoiceDatabaseService {
     try {
       const result = await pool.query(
         `SELECT invoice_number 
-         FROM invoices 
-         WHERE is_custom_number = true 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
+       FROM invoices 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
       );
 
       return result.rows.length > 0 ? result.rows[0].invoice_number : null;

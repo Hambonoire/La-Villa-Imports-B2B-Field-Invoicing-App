@@ -1,380 +1,210 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>La Villa B2B Invoice Generator - Agent Portal</title>
-    <link rel="stylesheet" href="/css/styles.css" />
-  </head>
-  <body>
-    <!-- Header -->
-    <header class="header">
-      <div class="header__container">
-        <h1 class="header__title">La Villa Imports</h1>
-        <p class="header__subtitle">Field Agent Invoice Portal</p>
-      </div>
-    </header>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Villa B2B Invoice Generator - Agent Portal</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .portal {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .portal__header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    
+    .portal__title {
+      font-size: 2.5rem;
+      color: #8B4513;
+      margin-bottom: 10px;
+    }
+    
+    .portal__subtitle {
+      font-size: 1.2rem;
+      color: #666;
+    }
+    
+    .status-bar {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin-bottom: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .status-bar__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-indicator--online {
+      background: #22c55e;
+    }
+    
+    .status-indicator--offline {
+      background: #ef4444;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+    
+    .feature-card {
+      background: white;
+      border: 2px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    
+    .feature-card:hover {
+      border-color: #8B4513;
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(139, 69, 19, 0.1);
+    }
+    
+    .feature-card__icon {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+    
+    .feature-card__title {
+      font-size: 1.5rem;
+      color: #8B4513;
+      margin-bottom: 10px;
+    }
+    
+    .feature-card__description {
+      color: #666;
+      line-height: 1.6;
+    }
+    
+    .feature-card__badge {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border-radius: 12px;
+      margin-top: 15px;
+      font-weight: 600;
+    }
+    
+    .feature-card__badge--offline {
+      background: #3b82f6;
+    }
+    
+    .feature-card--disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .feature-card--disabled:hover {
+      transform: none;
+      border-color: #e5e5e5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header__container">
+      <h1 class="header__title">La Villa Imports</h1>
+      <p class="header__subtitle">Field Agent Portal</p>
+    </div>
+  </header>
 
-    <!-- Main Content -->
-    <main class="main">
-      <div class="main__container">
-        <!-- Step 1: Customer Lookup & Information -->
-        <section class="section section--customer">
-          <h2 class="section__title">1. Customer Information</h2>
-
-          <!-- Customer Search -->
-          <div class="customer-lookup">
-            <label for="customerLookup" class="customer-lookup__label"
-              >Search for existing customer:</label
-            >
-            <div class="customer-lookup__search">
-              <input
-                type="text"
-                id="customerLookup"
-                class="customer-lookup__input"
-                placeholder="Search by name, company, or email..."
-              />
-              <button id="searchCustomerBtn" class="customer-lookup__button">
-                Search
-              </button>
-              <button
-                id="loadAllCustomersBtn"
-                class="customer-lookup__button"
-                style="background-color: #2c5f2d"
-              >
-                Load All
-              </button>
-            </div>
-            <div id="customerResults" class="customer-results"></div>
-          </div>
-
-          <!-- Customer Form (editable after selection) -->
-          <div class="form">
-            <div class="form__row">
-              <div class="form__field">
-                <label for="customerName" class="form__label"
-                  >Customer Name *</label
-                >
-                <input
-                  type="text"
-                  id="customerName"
-                  class="form__input"
-                  placeholder="John Doe"
-                  required
-                />
-              </div>
-              <div class="form__field">
-                <label for="customerCompany" class="form__label"
-                  >Company Name</label
-                >
-                <input
-                  type="text"
-                  id="customerCompany"
-                  class="form__input"
-                  placeholder="ABC Coffee Shop"
-                />
-              </div>
-            </div>
-
-            <div class="form__row">
-              <div class="form__field">
-                <label for="customerEmail" class="form__label">Email *</label>
-                <input
-                  type="email"
-                  id="customerEmail"
-                  class="form__input"
-                  placeholder="customer@example.com"
-                  required
-                />
-              </div>
-              <div class="form__field">
-                <label for="customerPhone" class="form__label">Phone *</label>
-                <input
-                  type="tel"
-                  id="customerPhone"
-                  class="form__input"
-                  placeholder="(555) 123-4567"
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="form__field">
-              <label for="customerAddress" class="form__label"
-                >Street Address *</label
-              >
-              <input
-                type="text"
-                id="customerAddress"
-                class="form__input"
-                placeholder="123 Main Street"
-                required
-              />
-            </div>
-
-            <div class="form__row">
-              <div class="form__field">
-                <label for="customerCity" class="form__label">City *</label>
-                <input
-                  type="text"
-                  id="customerCity"
-                  class="form__input"
-                  placeholder="Little Rock"
-                  required
-                />
-              </div>
-              <div class="form__field">
-                <label for="customerState" class="form__label">State *</label>
-                <input
-                  type="text"
-                  id="customerState"
-                  class="form__input"
-                  placeholder="AR"
-                  maxlength="2"
-                  required
-                />
-              </div>
-              <div class="form__field">
-                <label for="customerZip" class="form__label">ZIP Code *</label>
-                <input
-                  type="text"
-                  id="customerZip"
-                  class="form__input"
-                  placeholder="72201"
-                  required
-                />
-              </div>
-            </div>
-
-            <!-- Hidden field to store WooCommerce customer ID -->
-            <input type="hidden" id="customerId" value="" />
-          </div>
-        </section>
-
-        <!-- Step 2: Product Selection -->
-        <section class="section section--products">
-          <h2 class="section__title">2. Add Products</h2>
-
-          <div class="product-select">
-            <div class="product-select__search">
-              <input
-                type="text"
-                id="productSearch"
-                class="product-select__input"
-                placeholder="Search products by name or SKU..."
-              />
-              <button id="searchProductBtn" class="product-select__button">
-                Search
-              </button>
-            </div>
-
-            <div id="productResults" class="product-list"></div>
-          </div>
-
-          <!-- Selected Products / Cart -->
-          <div id="invoiceItems" class="invoice-items">
-            <h3 class="invoice-items__title">Invoice Items</h3>
-            <div id="itemsList" class="invoice-items__list">
-              <p class="invoice-items__empty">
-                No items added yet. Search and add products above.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Step 3: Invoice Details -->
-        <section class="section section--details">
-          <h2 class="section__title">3. Invoice Details</h2>
-
-          <div class="invoice-details">
-            <div class="invoice-details__field">
-              <label for="taxRate" class="invoice-details__label"
-                >Tax Rate (%)</label
-              >
-              <input
-                type="number"
-                id="taxRate"
-                class="invoice-details__input"
-                value="8.0"
-                step="0.1"
-                min="0"
-                max="100"
-              />
-            </div>
-
-            <!-- Payment Terms -->
-            <!-- Invoice Number -->
-            <div class="invoice-details__field">
-              <label class="invoice-details__label">Invoice Number *</label>
-              <div style="display: flex; gap: 10px; align-items: flex-start;">
-                <div style="flex: 1;">
-                  <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                    <input type="radio" name="invoiceNumberOption" value="auto" checked>
-                    <span>Auto-generate (Next: <span id="nextInvoiceNumber" style="font-weight: bold; color: #8B4513;">Loading...</span>)</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="radio" name="invoiceNumberOption" value="custom">
-                    <span>Custom</span>
-                  </label>
-                </div>
-                <div style="flex: 1;">
-                  <input
-                    type="text"
-                    id="customInvoiceNumber"
-                    class="invoice-details__input"
-                    placeholder="INV-YYYYMMDD-XXX"
-                    disabled
-                    style="width: 100%;"
-                  />
-                  <small style="color: #666; font-size: 12px;">Format: INV-20260305-001</small>
-                </div>
-              </div>
-            </div>
-
-            <div class="invoice-details__field">
-              <label for="paymentTerms" class="invoice-details__label"
-                >Payment Terms *</label
-              >
-              <select
-                id="paymentTerms"
-                class="invoice-details__select"
-                required
-              >
-                <option value="">-- Select Payment Terms --</option>
-                <option value="cod">COD (Cash on Delivery)</option>
-                <option value="check">Check</option>
-                <option value="net30">Net 30</option>
-              </select>
-            </div>
-
-            <!-- Check Number Field (hidden by default, shown when Check is selected) -->
-            <div
-              id="checkNumberField"
-              class="invoice-details__field invoice-details__field--hidden"
-            >
-              <label for="checkNumber" class="invoice-details__label"
-                >Check Number *</label
-              >
-              <input
-                type="text"
-                id="checkNumber"
-                class="invoice-details__input"
-                placeholder="Enter check number"
-              />
-            </div>
-
-            <div class="invoice-details__field">
-              <label for="notes" class="invoice-details__label"
-                >Invoice Notes (Optional)</label
-              >
-              <textarea
-                id="notes"
-                class="invoice-details__textarea"
-                rows="3"
-                placeholder="Add delivery instructions, payment terms, or other notes..."
-              ></textarea>
-            </div>
-          </div>
-        </section>
-
-        <!-- Step 4: Invoice Summary -->
-        <section class="section section--summary">
-          <h2 class="section__title">Invoice Summary</h2>
-
-          <!-- Payment Terms Display -->
-          <div
-            id="paymentTermsDisplay"
-            class="payment-terms"
-            style="display: none"
-          >
-            <span class="payment-terms__label">Payment Terms:</span>
-            <div class="payment-terms__value" id="paymentTermsText">
-              Not selected
-            </div>
-            <div
-              id="checkNumberDisplay"
-              class="payment-terms__check-number"
-              style="display: none"
-            ></div>
-          </div>
-
-          <div class="invoice-summary">
-            <div class="invoice-summary__row">
-              <span class="invoice-summary__label">Subtotal:</span>
-              <span id="subtotal" class="invoice-summary__value">$0.00</span>
-            </div>
-            <div class="invoice-summary__row">
-              <span class="invoice-summary__label"
-                >Tax (<span id="taxRateDisplay">8.0</span>%):</span
-              >
-              <span id="taxAmount" class="invoice-summary__value">$0.00</span>
-            </div>
-            <div class="invoice-summary__row invoice-summary__row--total">
-              <span class="invoice-summary__label">Total:</span>
-              <span id="total" class="invoice-summary__value">$0.00</span>
-            </div>
-          </div>
-
-          <div class="invoice-actions">
-            <button
-              id="clearFormBtn"
-              class="invoice-actions__button invoice-actions__button--secondary"
-            >
-              Clear Form
-            </button>
-            <button
-              id="previewBtn"
-              class="invoice-actions__button invoice-actions__button--secondary"
-              disabled
-            >
-              Preview Invoice
-            </button>
-            <button
-              id="generateBtn"
-              class="invoice-actions__button invoice-actions__button--primary"
-              disabled
-            >
-              Generate Invoice
-            </button>
-          </div>
-        </section>
-      </div>
-    </main>
-
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay loading-overlay--hidden">
-      <div class="loading-overlay__spinner"></div>
-      <p class="loading-overlay__text">Loading...</p>
+  <!-- Portal Content -->
+  <main class="portal">
+    <div class="portal__header">
+      <h2 class="portal__title">Welcome, Agent</h2>
+      <p class="portal__subtitle">Select a feature to get started</p>
     </div>
 
-    <!-- Modal for Invoice Preview -->
-    <div id="previewModal" class="modal modal--hidden">
-      <div class="modal__content">
-        <div class="modal__header">
-          <h2 class="modal__title">Invoice Preview</h2>
-          <button id="closeModalBtn" class="modal__close">&times;</button>
-        </div>
-        <div id="previewContent" class="modal__body"></div>
-        <div class="modal__footer">
-          <button
-            id="closePreviewBtn"
-            class="modal__button modal__button--secondary"
-          >
-            Close
-          </button>
-          <button
-            id="confirmGenerateBtn"
-            class="modal__button modal__button--primary"
-          >
-            Confirm & Generate
-          </button>
-        </div>
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-bar__item">
+        <div id="connectionStatus" class="status-indicator status-indicator--online"></div>
+        <span id="connectionText">Online</span>
+      </div>
+      <div class="status-bar__item">
+        <span id="draftStatus">No saved drafts</span>
+      </div>
+      <div class="status-bar__item">
+        <span id="syncStatus">All synced</span>
       </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="/js/apiClient.js"></script>
-    <script src="/js/invoiceBuilder.js"></script>
-    <script src="/js/app.js"></script>
-  </body>
+    <!-- Feature Cards -->
+    <div class="features">
+      <!-- Create Invoice -->
+      <a href="/pages/invoice.html" class="feature-card">
+        <div class="feature-card__icon">📄</div>
+        <h3 class="feature-card__title">Create Invoice</h3>
+        <p class="feature-card__description">
+          Generate new B2B invoices with customer lookup and auto-numbering
+        </p>
+        <span class="feature-card__badge feature-card__badge--offline">Works Offline</span>
+      </a>
+
+      <!-- Customer Management -->
+      <div class="feature-card feature-card--disabled">
+        <div class="feature-card__icon">👥</div>
+        <h3 class="feature-card__title">Customer Management</h3>
+        <p class="feature-card__description">
+          View, add, and edit customer information
+        </p>
+        <span class="feature-card__badge">Coming Soon</span>
+      </div>
+
+      <!-- Invoice History -->
+      <div class="feature-card feature-card--disabled">
+        <div class="feature-card__icon">📊</div>
+        <h3 class="feature-card__title">Invoice History</h3>
+        <p class="feature-card__description">
+          View past invoices and generate reports
+        </p>
+        <span class="feature-card__badge">Coming Soon</span>
+      </div>
+
+      <!-- Sync Management -->
+      <div class="feature-card feature-card--disabled">
+        <div class="feature-card__icon">🔄</div>
+        <h3 class="feature-card__title">Sync Management</h3>
+        <p class="feature-card__description">
+          Manage offline data and synchronization
+        </p>
+        <span class="feature-card__badge">Coming Soon</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/portal.js"></script>
+</body>
 </html>
