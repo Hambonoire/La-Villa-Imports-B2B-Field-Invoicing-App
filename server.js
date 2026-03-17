@@ -57,10 +57,12 @@ router.get("/api/health", (req, res) => {
 // Import and register routes
 const customerRoutes = require("./src/routes/customer.routes");
 const productRoutes = require("./src/routes/product.routes");
+const invoiceRoutes = require("./src/routes/invoice.routes");
 const invoiceController = require("./src/controllers/invoice.controller");
 
 router.use(customerRoutes);
 router.use(productRoutes);
+router.use(invoiceRoutes);
 
 // Get invoice PDF for viewing/printing
 router.get("/api/invoices/pdf/:invoiceNumber", (req, res) => {
